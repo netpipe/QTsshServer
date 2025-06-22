@@ -283,6 +283,8 @@ private slots:
         out << "LoginGraceTime " << (loginGraceEdit->text().isEmpty() ? "2m" : loginGraceEdit->text()) << "\n";
         out << "MaxAuthTries " << (maxAuthTriesEdit->text().isEmpty() ? "6" : maxAuthTriesEdit->text()) << "\n";
         out << "MaxSessions " << (maxSessionsEdit->text().isEmpty() ? "10" : maxSessionsEdit->text()) << "\n";
+        out << "AuthorizedKeysFile " << authorizedKeysEdit->text() << "\n";
+        out << "PubkeyAuthentication " << (pubkeyAuthCheck->isChecked() ? "yes" : "no") << "\n";
 
         if (noPasswordCheck->isChecked()) {
             out << "PasswordAuthentication no\n";
