@@ -101,6 +101,30 @@ public:
 
         sshdProcess = new QProcess(this);
 
+
+        // Key-based auth
+        authorizedKeysEdit = new QLineEdit(this);
+        authorizedKeysEdit->setText(QDir::homePath() + "/.ssh/authorized_keys");
+        layout->addRow("AuthorizedKeysFile:", authorizedKeysEdit);
+
+        pubkeyAuthCheck = new QCheckBox("Enable Public Key Authentication", this);
+        layout->addRow("", pubkeyAuthCheck);
+
+        genKeyBtn = new QPushButton("Generate SSH Key", this);
+        viewKeyBtn = new QPushButton("View Public Key", this);
+        authKeyBtn = new QPushButton("Authorize Public Key", this);
+
+        QHBoxLayout *keyBtnLayout = new QHBoxLayout();
+        keyBtnLayout->addWidget(genKeyBtn);
+        keyBtnLayout->addWidget(viewKeyBtn);
+        keyBtnLayout->addWidget(authKeyBtn);
+        mainLayout->addLayout(keyBtnLayout);
+
+        connect(genKeyBtn, &QPushButton::clicked, this, &SshdConfigEditor::generateKey);
+        connect(viewKeyBtn, &QPushButton::clicked, this, &SshdConfigEditor::viewPublicKey);
+        connect(authKeyBtn, &QPushButton::clicked, this, &SshdConfigEditor::authorizePublicKey);
+
+
         connect(loadBtn, &QPushButton::clicked, this, &SshdConfigEditor::loadConfig);
         connect(saveBtn, &QPushButton::clicked, this, &SshdConfigEditor::saveConfig);
         connect(startBtn, &QPushButton::clicked, this, &SshdConfigEditor::startSshd);
@@ -120,6 +144,53 @@ private slots:
             configPathEdit->setText(file);
             loadConfig();
         }
+    }
+    void generateKey() {
+        QString privKey = QDir::homePath() + "/.ssh/id_ed25519";
+        if (QFile::exists(privKey)) {
+            QMessageBox::StandardButton reply = QMessageBox::question(this, "Key Exists",
+                "SSH key already exists. Overwrite?", QMessageBox::Yes|QMessageBox::No);
+            if (reply == QMessageBox::No)
+                return;
+        }
+        QProcess::execute("ssh-keygen", {"-t", "ed25519", "-f", privKey, "-N", ""});
+        QMessageBox::information(this, "Done", "SSH key generated at:\n" + privKey);
+    }
+
+    void viewPublicKey() {
+        QString pubKey = QDir::homePath() + "/.ssh/id_ed25519.pub";
+        QFile f(pubKey);
+        if (!f.exists() || !f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QMessageBox::warning(this, "Missing Key", "Public key not found:\n" + pubKey);
+            return;
+        }
+        QTextStream in(&f);
+        QString key = in.readAll();
+        f.close();
+        QMessageBox::information(this, "Public Key", key);
+    }
+
+    void authorizePublicKey() {
+        QString pubKey = QDir::homePath() + "/.ssh/id_ed25519.pub";
+        QFile f(pubKey);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QMessageBox::warning(this, "Missing", "Public key not found:\n" + pubKey);
+            return;
+        }
+        QString key = f.readAll().trimmed();
+        f.close();
+
+        QString authFile = authorizedKeysEdit->text();
+        QFile af(authFile);
+        if (!af.open(QIODevice::Append | QIODevice::Text)) {
+            QMessageBox::warning(this, "Error", "Could not open authorized_keys to append:\n" + authFile);
+            return;
+        }
+        QTextStream out(&af);
+        out << key << "\n";
+        af.close();
+
+        QMessageBox::information(this, "Success", "Key added to:\n" + authFile);
     }
 
     void loadConfig() {
@@ -316,6 +387,12 @@ private:
 
     QPlainTextEdit *outputEdit;
     QProcess *sshdProcess;
+    QLineEdit *authorizedKeysEdit;
+    QCheckBox *pubkeyAuthCheck;
+    QPushButton *genKeyBtn;
+    QPushButton *viewKeyBtn;
+    QPushButton *authKeyBtn;
+
 };
 
 
